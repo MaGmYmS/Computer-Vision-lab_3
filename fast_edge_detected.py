@@ -114,12 +114,13 @@ def apply_difference_of_gaussian_filter(image, sigma1):
 
 def apply_custom_laplacian_of_gaussian_filter(image, sigma):
     # Применяем фильтр Гаусса
+    sigma = sigma * np.sqrt(2)
     blurred_image = apply_custom_gaussian_filter(image, sigma)
 
     # Фильтр Лапласа
     laplacian_filter = np.array([[0, 1, 0],
                                  [1, -4, 1],
-                                 [0, 1, 0]])
+                                 [0, 1, 0]]) * sigma ** 2
 
     filtered_image = convolve2d(blurred_image, laplacian_filter, mode='same', boundary='symm')
 
@@ -174,20 +175,20 @@ def compare_result(image, methods, filter_sizes):
     plt.show()
 
 
-if __name__ == "__main__":
-    # input_video_path = 'Пол кило.mp4'
-    input_video_path = 'Кот кушает2.mp4'
-    frame_step = 1  # каждый N-й кадр будет обработан
-    filter_size = 5
-    process_video(input_video_path, filter_size, frame_step)
+# if __name__ == "__main__":
+#     # input_video_path = 'Пол кило.mp4'
+#     input_video_path = 'Кот кушает2.mp4'
+#     frame_step = 1  # каждый N-й кадр будет обработан
+#     filter_size = 5
+#     process_video(input_video_path, filter_size, frame_step)
 
 
 if __name__ == "__main__":
-    input_image_path = "images/flower.jpg"
+    input_image_path = "images/flower_gauss_1_sigma.jpg"
     # Чтение изображения с помощью cv2
     input_image = cv2.imread(input_image_path, cv2.IMREAD_GRAYSCALE)
 
-    filter_sizes_dict = {apply_custom_sobel_filter: [3, 5, 7], apply_custom_laplacian_of_gaussian_filter: [0.5, 2, 5],
+    filter_sizes_dict = {apply_custom_sobel_filter: [3, 5, 7], apply_custom_laplacian_of_gaussian_filter: [0.5, 1, 2],
                          apply_difference_of_gaussian_filter: [0.5, 1, 2]}
     methods_filter = [apply_custom_sobel_filter, apply_custom_laplacian_of_gaussian_filter,
                       apply_difference_of_gaussian_filter]
