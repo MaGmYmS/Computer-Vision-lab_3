@@ -92,7 +92,7 @@ def apply_custom_gaussian_filter(image_array, sigma):
     return filtered_image.astype(np.uint8)
 
 
-def apply_difference_of_gaussian_filter(image, sigma1):
+def apply_custom_difference_of_gaussian_filter(image, sigma1):
     """
     Применяет фильтр DoG (Difference of Gaussians) к изображению.
     """
@@ -127,30 +127,35 @@ def apply_custom_laplacian_of_gaussian_filter(image, sigma):
     return filtered_image.astype(np.uint8)
 
 
-def process_video(video_path, filter_size, frame_step=10):
+def process_video(video_path, process_method, filter_size_in, frame_step_in=10):
     # Чтение видео
     cap = cv2.VideoCapture(video_path)
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-    print("Total frames:", frame_count)
+    start_time = time.time()  # Засекаем время начала выполнения метода
 
     # Чтение каждого frame_step-го кадра из видео и обработка
-    for i in range(0, frame_count, frame_step):
+    for i in range(0, frame_count, frame_step_in):
         cap.set(cv2.CAP_PROP_POS_FRAMES, i)
         ret, frame = cap.read()
         if ret:
             # Применение функции foo к кадру
             frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            frame_grayscale = apply_custom_sobel_filter(frame_grayscale, filter_size)
+            frame_grayscale = process_method(frame_grayscale, filter_size_in)
             # Отображение кадра
-            cv2.imshow("Processed Video", frame_grayscale)
+            cv2.imshow(process_method.__name__, frame_grayscale)
             cv2.waitKey(1)  # Необходимо для корректного отображения кадра
         else:
             print("Failed to read frame")
 
     # Закрытие видео-файла
     cap.release()
+
+    end_time = time.time()  # Засекаем время окончания выполнения метода
+    execution_time = end_time - start_time  # Вычисляем время выполнения
+    print(f"Метод '{process_method.__name__}' обработал 5 секунд видео за {execution_time:.2f} секунд c "
+          f"frame_step = {frame_step_in} и filter_size = {filter_size_in}")
 
 
 def compare_result(image, methods, filter_sizes):
@@ -175,21 +180,26 @@ def compare_result(image, methods, filter_sizes):
     plt.show()
 
 
-# if __name__ == "__main__":
-#     # input_video_path = 'Пол кило.mp4'
-#     input_video_path = 'Кот кушает2.mp4'
-#     frame_step = 1  # каждый N-й кадр будет обработан
-#     filter_size = 5
-#     process_video(input_video_path, filter_size, frame_step)
-
-
 if __name__ == "__main__":
-    input_image_path = "images/flower_gauss_1_sigma.jpg"
-    # Чтение изображения с помощью cv2
-    input_image = cv2.imread(input_image_path, cv2.IMREAD_GRAYSCALE)
-
+    # input_video_path = 'Пол кило.mp4'
     filter_sizes_dict = {apply_custom_sobel_filter: [3, 5, 7], apply_custom_laplacian_of_gaussian_filter: [0.5, 1, 2],
-                         apply_difference_of_gaussian_filter: [0.5, 1, 2]}
+                         apply_custom_difference_of_gaussian_filter: [0.5, 1, 2]}
     methods_filter = [apply_custom_sobel_filter, apply_custom_laplacian_of_gaussian_filter,
-                      apply_difference_of_gaussian_filter]
-    compare_result(input_image, methods_filter, filter_sizes_dict)
+                      apply_custom_difference_of_gaussian_filter]
+    input_video_path = 'Кот кушает2 5 сек.mp4'
+    frame_step = 2  # каждый N-й кадр будет обработан
+    # filter_size = 3
+    for method in methods_filter:
+        for i, filter_size in enumerate(filter_sizes_dict[method]):
+            process_video(input_video_path, method, filter_size, frame_step)
+
+# if __name__ == "__main__":
+#     input_image_path = "images/flower_gauss_1_sigma.jpg"
+#     # Чтение изображения с помощью cv2
+#     input_image = cv2.imread(input_image_path, cv2.IMREAD_GRAYSCALE)
+#
+#     filter_sizes_dict = {apply_custom_sobel_filter: [3, 5, 7], apply_custom_laplacian_of_gaussian_filter: [0.5, 1, 2],
+#                          apply_difference_of_gaussian_filter: [0.5, 1, 2]}
+#     methods_filter = [apply_custom_sobel_filter, apply_custom_laplacian_of_gaussian_filter,
+#                       apply_difference_of_gaussian_filter]
+#     compare_result(input_image, methods_filter, filter_sizes_dict)
