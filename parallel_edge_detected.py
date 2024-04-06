@@ -1,9 +1,36 @@
+import os
 import time
 
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import convolve2d
+from numba import njit, prange
+
+
+@njit(parallel=True)
+def convolve(image, kernel):
+    # Получаем размеры изображения и ядра
+    image_height, image_width = image.shape
+    kernel_height, kernel_width = kernel.shape
+
+    half_size_kernel = kernel_height // 2
+
+    # Создаем пустой массив для выходного изображения
+    output = np.zeros_like(image)
+
+    # Проходим по каждому пикселю выходного изображения
+    for i in prange(half_size_kernel, image_height - half_size_kernel):
+        for j in prange(half_size_kernel, image_width - half_size_kernel):
+            region = image[i - half_size_kernel:i + half_size_kernel + 1,
+                     j - half_size_kernel:j + half_size_kernel + 1]
+
+            weighted_sum = np.sum(region * kernel)
+
+            # Записываем в отфильтрованное изображение нормированное значение
+            output[i, j] = weighted_sum
+
+    return output
 
 
 def generate_sobel_filter(size):
@@ -55,8 +82,8 @@ def generate_sobel_filter(size):
 def apply_custom_sobel_filter(image, filter_size):
     sobel_x, sobel_y = generate_sobel_filter(filter_size)
 
-    gradient_x = convolve2d(image, sobel_x, mode='same', boundary='symm')
-    gradient_y = convolve2d(image, sobel_y, mode='same', boundary='symm')
+    gradient_x = convolve2d(image, sobel_x)
+    gradient_y = convolve2d(image, sobel_y)
 
     # Вычисляем абсолютное значение градиента
     gradient_magnitude = np.sqrt(gradient_x ** 2 + gradient_y ** 2).astype(np.uint8)
@@ -87,7 +114,7 @@ def apply_custom_gaussian_filter(image_array, sigma):
         kernel_size += 1
     gaussian_kernel = custom_gaussian_kernel(kernel_size, sigma)
 
-    filtered_image = convolve2d(image_array, gaussian_kernel, mode='same', boundary='symm')
+    filtered_image = convolve(image_array, gaussian_kernel)
 
     return filtered_image.astype(np.uint8)
 
@@ -122,7 +149,7 @@ def apply_custom_laplacian_of_gaussian_filter(image, sigma):
                                  [1, -4, 1],
                                  [0, 1, 0]]) * sigma ** 2
 
-    filtered_image = convolve2d(blurred_image, laplacian_filter, mode='same', boundary='symm')
+    filtered_image = convolve(blurred_image, laplacian_filter)
 
     return filtered_image.astype(np.uint8)
 
@@ -162,36 +189,43 @@ def compare_result(image, methods, filter_sizes):
     fig, axes = plt.subplots(len(methods), len(filter_sizes), figsize=(10, 10))
     plt.subplots_adjust(wspace=0.5, hspace=0.5)  # Добавляем отступы между изображениями
 
-    for method_idx, method in enumerate(methods):
-        for row_idx in range(len(filter_sizes[method])):
-            filter_size = filter_sizes[method][row_idx]
-            start_time = time.time()
-            output_image = method(image, filter_size)
-            end_time = time.time()
-            execution_time = end_time - start_time
+    for _ in range(2):
+        for method_idx, method in enumerate(methods):
+            for row_idx in range(len(filter_sizes[method])):
+                filter_size = filter_sizes[method][row_idx]
+                start_time = time.time()
+                output_image = method(image, filter_size)
+                end_time = time.time()
+                execution_time = end_time - start_time
 
-            ax = axes[method_idx][row_idx]
-            ax.imshow(output_image, cmap='gray')
-            ax.set_title(f"{method.__name__}\nFilter Size: {filter_size}\nExecution Time: {execution_time:.4f} sec",
-                         fontsize=8)
-            ax.axis('off')
+                # Вычисление метрики (среднеквадратичной ошибки) между оригинальным и обработанным изображением
+                # Вычисление метрики определения границ (количество границ)
+                edges = cv2.Canny(output_image, 150, 255)
+                num_edges = np.sum(edges > 0)
+                ax = axes[method_idx][row_idx]
+                ax.imshow(output_image, cmap='gray')
+                ax.set_title(
+                    f"{method.__name__}\nFilter Size: {filter_size}\nCount edges: {num_edges:.4f}  Execution Time: "
+                    f"{execution_time:.4f} sec",
+                    fontsize=8)
+                ax.axis('off')
 
     plt.tight_layout()
     plt.show()
 
 
-# if __name__ == "__main__":
-#     # input_video_path = 'Пол кило.mp4'
-#     filter_sizes_dict = {apply_custom_sobel_filter: [3, 5, 7], apply_custom_laplacian_of_gaussian_filter: [0.5, 1, 2],
-#                          apply_custom_difference_of_gaussian_filter: [0.5, 1, 2]}
-#     methods_filter = [apply_custom_sobel_filter, apply_custom_laplacian_of_gaussian_filter,
-#                       apply_custom_difference_of_gaussian_filter]
-#     input_video_path = 'Кот кушает2 5 сек.mp4'
-#     frame_step = 2  # каждый N-й кадр будет обработан
-#     # filter_size = 3
-#     for method in methods_filter:
-#         for i, filter_size in enumerate(filter_sizes_dict[method]):
-#             process_video(input_video_path, method, filter_size, frame_step)
+if __name__ == "__main__":
+    # input_video_path = 'Пол кило.mp4'
+    filter_sizes_dict = {apply_custom_sobel_filter: [3, 5, 7], apply_custom_laplacian_of_gaussian_filter: [0.5, 1, 2],
+                         apply_custom_difference_of_gaussian_filter: [0.5, 1, 2]}
+    methods_filter = [apply_custom_sobel_filter, apply_custom_laplacian_of_gaussian_filter,
+                      apply_custom_difference_of_gaussian_filter]
+    input_video_path = 'Кот кушает2 5 сек.mp4'
+    frame_step = 1  # каждый N-й кадр будет обработан
+    # filter_size = 3
+    for method in methods_filter:
+        for i, filter_size in enumerate(filter_sizes_dict[method]):
+            process_video(input_video_path, method, filter_size, frame_step)
 
 if __name__ == "__main__":
     input_image_path = "images/flower.jpg"
