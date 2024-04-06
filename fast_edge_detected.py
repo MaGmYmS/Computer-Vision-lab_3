@@ -1,5 +1,8 @@
+import time
+
 import cv2
 import numpy as np
+from matplotlib import pyplot as plt
 from scipy.signal import convolve2d
 
 
@@ -123,17 +126,69 @@ def apply_custom_laplacian_of_gaussian_filter(image, sigma):
     return filtered_image.astype(np.uint8)
 
 
+def process_video(video_path, filter_size, frame_step=10):
+    # Чтение видео
+    cap = cv2.VideoCapture(video_path)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+    print("Total frames:", frame_count)
+
+    # Чтение каждого frame_step-го кадра из видео и обработка
+    for i in range(0, frame_count, frame_step):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, i)
+        ret, frame = cap.read()
+        if ret:
+            # Применение функции foo к кадру
+            frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            frame_grayscale = apply_custom_sobel_filter(frame_grayscale, filter_size)
+            # Отображение кадра
+            cv2.imshow("Processed Video", frame_grayscale)
+            cv2.waitKey(1)  # Необходимо для корректного отображения кадра
+        else:
+            print("Failed to read frame")
+
+    # Закрытие видео-файла
+    cap.release()
+
+
+def compare_result(image, methods, filter_sizes):
+    fig, axes = plt.subplots(len(methods), len(filter_sizes), figsize=(10, 10))
+    plt.subplots_adjust(wspace=0.5, hspace=0.5)  # Добавляем отступы между изображениями
+
+    for method_idx, method in enumerate(methods):
+        for row_idx in range(len(filter_sizes[method])):
+            filter_size = filter_sizes[method][row_idx]
+            start_time = time.time()
+            output_image = method(image, filter_size)
+            end_time = time.time()
+            execution_time = end_time - start_time
+
+            ax = axes[method_idx][row_idx]
+            ax.imshow(output_image, cmap='gray')
+            ax.set_title(f"{method.__name__}\nFilter Size: {filter_size}\nExecution Time: {execution_time:.4f} sec",
+                         fontsize=8)
+            ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    # input_video_path = 'Пол кило.mp4'
+    input_video_path = 'Кот кушает2.mp4'
+    frame_step = 1  # каждый N-й кадр будет обработан
+    filter_size = 5
+    process_video(input_video_path, filter_size, frame_step)
+
+
 if __name__ == "__main__":
     input_image_path = "images/flower.jpg"
     # Чтение изображения с помощью cv2
     input_image = cv2.imread(input_image_path, cv2.IMREAD_GRAYSCALE)
-    out_image = apply_difference_of_gaussian_filter(input_image, 1)
 
-    # Отображение изображения
-    cv2.imshow("Filtered image", out_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-    # Сохранение изображения
-    output_image_path = "sobel_result.jpg"
-    cv2.imwrite(output_image_path, out_image)
+    filter_sizes_dict = {apply_custom_sobel_filter: [3, 5, 7], apply_custom_laplacian_of_gaussian_filter: [0.5, 2, 5],
+                         apply_difference_of_gaussian_filter: [0.5, 1, 2]}
+    methods_filter = [apply_custom_sobel_filter, apply_custom_laplacian_of_gaussian_filter,
+                      apply_difference_of_gaussian_filter]
+    compare_result(input_image, methods_filter, filter_sizes_dict)
